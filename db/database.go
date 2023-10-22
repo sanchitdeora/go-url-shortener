@@ -3,16 +3,9 @@ package db
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"time"
 
-	"github.com/go-sql-driver/mysql"
 	"github.com/rs/zerolog/log"
-)
-
-const (  
-    hostname = "127.0.0.1:3306"
-    dbname   = "urlshortenerdb"
 )
 
 var (
@@ -20,110 +13,52 @@ var (
 	// password = os.Getenv("DBPASS")
 )
 
+type UrlShortener struct {
+    CompleteURL  string
+    ShortenedURL string 
+}
+
 type Database interface {
-	Init()
-	InsertUrl() error
+	// Init() *sql.DB
+	SaveUrl(c context.Context, urlShortener *UrlShortener) error
 }
 
-type dbImpl struct {}
-
-func NewDatabase() Database {
-	return &dbImpl{}
+type Opts struct {
+    Hostname string
+    DBName string
+    TableName string
+    TimeoutSeconds time.Duration
+    MaxOpenConns int
+    MaxIdleConns int
+    MaxConnsLifetime time.Duration
+    DBConnection *sql.DB
 }
 
-func (db *dbImpl) InsertUrl() error {
-	return nil
+type dbImpl struct {
+    *Opts
 }
 
-func (d *dbImpl) Init() {
-	// establish db connection
-	db, err := dbConnection()
-    if err != nil {
-        log.Error().Msg(fmt.Sprintf("Error %s while getting db connection", err))
-        return
-    }
-    defer db.Close()
-
-	// create url shortener table	
-	err = createUrlShortenerTable(db)
-    if err != nil {
-        log.Printf("Create url shortener table failed with error %s", err)
-        return
-    }
+func NewDatabase(opts *Opts) Database {
+	return &dbImpl{Opts: opts}
 }
 
-func dbConnection() (*sql.DB, error) {  
-    
-	// open sql connection
-    // Capture connection properties.
-    cfg := mysql.Config{
-        User:   "root",
-        Passwd: "Password@1",
-        Net:    "tcp",
-        Addr:   "127.0.0.1:3306",
-		AllowNativePasswords: true,
-    }
-
-    db, err := sql.Open("mysql", cfg.FormatDSN())
-    if err != nil {
-        log.Info().Msg(fmt.Sprintf("Error %s when opening DB\n", err))
-        return nil, err
-    }
-
-    ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
+func (db *dbImpl) SaveUrl(c context.Context, urlShortener *UrlShortener) error {
+    query := `INSERT INTO urlshortener(completeurl, shortenedurl) VALUES (?, ?)`
+    ctx, cancelfunc := context.WithTimeout(context.Background(), 5 * time.Second)
     defer cancelfunc()
 
-	// create db if not exists
-	_, err = db.ExecContext(ctx, "CREATE DATABASE IF NOT EXISTS " + dbname)
+    res, err := db.DBConnection.ExecContext(ctx, query, urlShortener.CompleteURL, urlShortener.ShortenedURL )
     if err != nil {
-        log.Info().Msg(fmt.Sprintf("Error %s when creating DB\n", err))
-        return nil, err
+        log.Printf("Error %s when inserting row into products table", err)
+        return err
     }
 
-    db.SetMaxOpenConns(20)
-    db.SetMaxIdleConns(20)
-    db.SetConnMaxLifetime(time.Minute * 5)
-
-    db.Close()
-
-	// connect to database
-	cfg.DBName = dbname
-    db, err = sql.Open("mysql", cfg.FormatDSN())
+    rows, err := res.RowsAffected()
     if err != nil {
-        log.Printf("Error %s when opening DB", err)
-        return nil, err
+        log.Printf("Error %s when finding rows affected", err)
+        return err
     }
-
-    ctx, cancelfunc = context.WithTimeout(context.Background(), 5 * time.Second)
-    defer cancelfunc()
-
-	err = db.PingContext(ctx)
-    if err != nil {
-        log.Info().Msg(fmt.Sprintf("Errors %s pinging DB", err))
-        return nil, err
-    }
-
-    log.Printf("Connected to DB %s successfully\n", dbname)
-    return db, nil
-}
-
-func createUrlShortenerTable(db *sql.DB) error {  
-	// create table if not exist
-	query := `CREATE TABLE IF NOT EXISTS urlshortener(
-			id int primary key auto_increment,
-			completeurl text,
-			shortenedurl text
-		)`
-	
-	ctx, cancelfunc := context.WithTimeout(context.Background(), 5 * time.Second)  
-	defer cancelfunc()
-
-	_, err := db.ExecContext(ctx, query)  
-	if err != nil {  
-		log.Printf("Error %s when creating url shortener table", err)
-		return err
-	}
-
+    log.Printf("%d URLs created ", rows)
 	return nil
 }
 
