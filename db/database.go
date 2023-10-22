@@ -13,14 +13,10 @@ var (
 	// password = os.Getenv("DBPASS")
 )
 
-type UrlShortener struct {
-    CompleteURL  string
-    ShortenedURL string 
-}
-
 type Database interface {
-	// Init() *sql.DB
-	SaveUrl(c context.Context, urlShortener *UrlShortener) error
+    GetShortenedUrl(c context.Context, completeUrl string) (string, error)
+    GetCompleteUrl(c context.Context, shortenedUrl string) (string, error)
+    SaveUrl(c context.Context, completeUrl, shortenedUrl string) error
 }
 
 type Opts struct {
@@ -42,14 +38,14 @@ func NewDatabase(opts *Opts) Database {
 	return &dbImpl{Opts: opts}
 }
 
-func (db *dbImpl) SaveUrl(c context.Context, urlShortener *UrlShortener) error {
+func (db *dbImpl) SaveUrl(c context.Context, completeUrl, shortenedUrl string) error {
     query := `INSERT INTO urlshortener(completeurl, shortenedurl) VALUES (?, ?)`
     ctx, cancelfunc := context.WithTimeout(context.Background(), 5 * time.Second)
     defer cancelfunc()
 
-    res, err := db.DBConnection.ExecContext(ctx, query, urlShortener.CompleteURL, urlShortener.ShortenedURL )
+    res, err := db.DBConnection.ExecContext(ctx, query, completeUrl, shortenedUrl)
     if err != nil {
-        log.Printf("Error %s when inserting row into products table", err)
+        log.Printf("Error %s when inserting row into urlshortener table", err)
         return err
     }
 
@@ -62,3 +58,36 @@ func (db *dbImpl) SaveUrl(c context.Context, urlShortener *UrlShortener) error {
 	return nil
 }
 
+func (db *dbImpl) GetShortenedUrl(c context.Context, completeUrl string) (string, error) {
+    query := `SELECT shortenedurl FROM urlshortener WHERE completeurl = ?`
+    ctx, cancelfunc := context.WithTimeout(context.Background(), 5 * time.Second)
+    defer cancelfunc()
+
+    row := db.DBConnection.QueryRowContext(ctx, query, completeUrl)
+    var shortenedURL string
+    if err := row.Scan(&shortenedURL); err != nil {
+        if err == sql.ErrNoRows {
+            return "", nil
+        }
+        return "", err
+    }
+
+    return shortenedURL, nil
+}
+
+func (db *dbImpl) GetCompleteUrl(c context.Context, shortenedUrl string) (string, error) {
+    query := `SELECT completeurl FROM urlshortener WHERE shortenedurl = ?`
+    ctx, cancelfunc := context.WithTimeout(context.Background(), 5 * time.Second)
+    defer cancelfunc()
+
+    row := db.DBConnection.QueryRowContext(ctx, query, shortenedUrl)
+    var completeUrl string
+    if err := row.Scan(&completeUrl); err != nil {
+        if err == sql.ErrNoRows {
+            return "", nil
+        }
+        return "", err
+    }
+
+    return completeUrl, nil
+}

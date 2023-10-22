@@ -27,14 +27,24 @@ func NewUrlShortener(opts *Opts) Service {
 }
 
 func (s *serviceImpl) UrlShortener(c context.Context, completeUrl string) (string, error) {
-	
+
+	shortenedUrl, err := s.DB.GetShortenedUrl(c, completeUrl)
+	if err != nil {
+		log.Error().AnErr("Error while fetching shortened URL", err)
+		return "", err
+	}
+	if shortenedUrl != "" {
+		log.Info().Str("shortened URL already exists", shortenedUrl).Send()
+		return shortenedUrl, nil
+	}
+
 	// Generate a unique shortened key for the original URL
 	shortenedKey := createKey(completeUrl, s.KeyLength)
 
 	log.Printf(shortenedKey)
 
-	shortenedUrl := s.ShortKeyPrefix + shortenedKey
-	err := s.DB.SaveUrl(c, &db.UrlShortener{CompleteURL: completeUrl, ShortenedURL: shortenedUrl})
+	shortenedUrl = s.ShortKeyPrefix + shortenedKey
+	err = s.DB.SaveUrl(c, completeUrl, shortenedUrl)
 	if err != nil {
 		log.Error().AnErr("Error while saving URL", err)
 		return "", err
