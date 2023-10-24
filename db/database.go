@@ -14,7 +14,7 @@ var (
 )
 
 type Database interface {
-    GetShortenedUrl(c context.Context, completeUrl string) (string, error)
+    GetShortenedKey(c context.Context, completeUrl string) (string, error)
     GetCompleteUrl(c context.Context, shortenedUrl string) (string, error)
     SaveUrl(c context.Context, completeUrl, shortenedUrl string) error
 }
@@ -58,7 +58,7 @@ func (db *dbImpl) SaveUrl(c context.Context, completeUrl, shortenedUrl string) e
 	return nil
 }
 
-func (db *dbImpl) GetShortenedUrl(c context.Context, completeUrl string) (string, error) {
+func (db *dbImpl) GetShortenedKey(c context.Context, completeUrl string) (string, error) {
     query := `SELECT shortenedurl FROM urlshortener WHERE completeurl = ?`
     ctx, cancelfunc := context.WithTimeout(context.Background(), 5 * time.Second)
     defer cancelfunc()

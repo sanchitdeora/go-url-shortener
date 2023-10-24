@@ -27,9 +27,30 @@ func (service *ApiService) HandleUrlShortener(c *gin.Context) {
 		})
 		return
 	}
-
-	c.JSON(200, gin.H{
-		"message": "success",
+ 
+	c.HTML(http.StatusOK, "shorten.tmpl", gin.H{
+		"title": "URL Shortener",
+		"completeUrl": completeUrl,
 		"shortenedUrl": shortenedUrl,
 	})
+}
+
+func (service *ApiService) HandleUrlRedirect(c *gin.Context) {
+	shortenedKey := c.Param("id")
+
+	completeUrl, err := service.UrlShortService.GetCompleteUrl(c, shortenedKey)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err, 
+		})
+		return
+	}
+	if completeUrl == "" {
+		c.JSON(http.StatusNoContent, gin.H{
+			"message": "no url found", 
+		})
+		return
+	}
+
+	c.Redirect(http.StatusFound, completeUrl)
 }

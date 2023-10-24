@@ -1,0 +1,22 @@
+{{ define "shorten.tmpl" }}
+<html>
+    <head>
+        <title>{{ .title }}</title>
+    </head>
+    <body>
+        <h2>{{ .title }}</h2>
+        
+        <h3>Complete URL: </h5>
+        <p>{{ .completeUrl }}</p>
+        
+        <h3>Shortened URL: </h5>
+        <p><a href="{{ .shortenedUrl }}">{{ .shortenedUrl }}</a></p>
+    </body>
+    <style>
+		body {
+            font-family: Calibri;
+            word-wrap: break-word;
+        }
+	</style>
+</html>
+{{ end }}

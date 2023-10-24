@@ -2,7 +2,9 @@ package urlshort
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
+	"strings"
 
 	"github.com/rs/zerolog/log"
 	"github.com/sanchitdeora/db"
@@ -10,6 +12,8 @@ import (
 
 type Service interface {
 	UrlShortener(c context.Context, url string) (string, error)
+	GetCompleteUrl(c context.Context, shortenedUrl string) (string, error)
+	GetShortenedUrl(c context.Context, completeUrl string) (string, error)
 }
 
 type serviceImpl struct {
@@ -17,40 +21,55 @@ type serviceImpl struct {
 }
 
 type Opts struct {
-	KeyLength 		int
-	ShortKeyPrefix  string
-	DB 			    db.Database
+	KeyLength 				int
+	ShortKeyDomainPrefix    string
+	Port 					string
+	DB 			    		db.Database
 }
 
 func NewUrlShortener(opts *Opts) Service {
 	return &serviceImpl{Opts: opts}
 }
 
-func (s *serviceImpl) UrlShortener(c context.Context, completeUrl string) (string, error) {
-
-	shortenedUrl, err := s.DB.GetShortenedUrl(c, completeUrl)
+func (s *serviceImpl) GetCompleteUrl(c context.Context, shortenedKey string) (string, error) {
+	completeUrl, err := s.DB.GetCompleteUrl(c, shortenedKey)
 	if err != nil {
-		log.Error().AnErr("Error while fetching shortened URL", err)
+		log.Error().AnErr("Error while fetching completeUrl URL", err)
 		return "", err
 	}
-	if shortenedUrl != "" {
-		log.Info().Str("shortened URL already exists", shortenedUrl).Send()
-		return shortenedUrl, nil
+	return completeUrl, nil
+}
+
+func (s *serviceImpl) GetShortenedUrl(c context.Context, completeUrl string) (string, error) {
+	shortenedKey, err := s.DB.GetShortenedKey(c, completeUrl)
+	if err != nil {
+		log.Error().AnErr("Error while fetching shortened key", err)
+		return "", err
+	}
+	return shortenedKey, nil
+}
+
+func (s *serviceImpl) UrlShortener(c context.Context, completeUrl string) (string, error) {
+
+	shortenedKey, err := s.GetShortenedUrl(c, completeUrl)
+	if err != nil {
+		return "", err
+	}
+	if shortenedKey != "" {
+		log.Info().Str("shortened kry already exists", shortenedKey).Send()
+		return s.buildShortenedUrl(shortenedKey), nil
 	}
 
 	// Generate a unique shortened key for the original URL
-	shortenedKey := createKey(completeUrl, s.KeyLength)
+	shortenedKey = createKey(completeUrl, s.KeyLength)
 
-	log.Printf(shortenedKey)
-
-	shortenedUrl = s.ShortKeyPrefix + shortenedKey
-	err = s.DB.SaveUrl(c, completeUrl, shortenedUrl)
+	err = s.DB.SaveUrl(c, completeUrl, shortenedKey)
 	if err != nil {
 		log.Error().AnErr("Error while saving URL", err)
 		return "", err
 	}
 
-	return shortenedUrl, nil
+	return s.buildShortenedUrl(shortenedKey), nil
 }
 
 func createKey(url string, length int) (string) {
@@ -61,4 +80,12 @@ func createKey(url string, length int) (string) {
 		key[i] = charset[rand.Intn(len(charset))]
 	}
 	return string(key)
+}
+
+func (s *serviceImpl) buildShortenedUrl(key string) string {
+	if strings.Contains(s.ShortKeyDomainPrefix, "localhost") {
+		return fmt.Sprintf("%s%s/short/%s", s.ShortKeyDomainPrefix, s.Port, key)
+	}
+
+	return fmt.Sprintf("%s/short/%s", s.ShortKeyDomainPrefix, key)
 }

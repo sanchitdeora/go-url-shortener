@@ -30,13 +30,14 @@ func main() {
 	dbConn := db.Init(dbopts)
 	dbopts.DBConnection = dbConn
 	defer dbConn.Close()
-	
+
 	db := db.NewDatabase(dbopts)
 
 	// service initialization
 	urlShortService := urlshort.NewUrlShortener(&urlshort.Opts{
 		KeyLength: 10,
-		ShortKeyPrefix: "http://shorturl/",
+		ShortKeyDomainPrefix: "http://localhost",
+		Port: PORT_NUMBER,
 		DB: db,
 	})
 
@@ -48,13 +49,16 @@ func main() {
 func startRouter(service *urlshort.ApiService) {
 	r := gin.Default()
 
+	r.LoadHTMLGlob("static/templates/*")
+
 	r.Use(static.Serve("/", static.LocalFile("./static", true)))
 	r.GET("/ping", func(c *gin.Context) {
 	  c.String(200, "test")
 	})
 
 	r.POST("/shorten", service.HandleUrlShortener)
-
+	r.GET("/short/:id", service.HandleUrlRedirect)
+	
 	log.Printf("URL Shortener is listening on", PORT_NUMBER)
 	r.Run(PORT_NUMBER)
 }
