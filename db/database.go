@@ -13,6 +13,7 @@ var (
 	// password = os.Getenv("DBPASS")
 )
 
+//go:generate mockgen -destination=./mocks/mock_db.go -package=mock_db github.com/sanchitdeora/go-url-shortener/db Database
 type Database interface {
     GetShortenedKey(c context.Context, completeUrl string) (string, error)
     GetCompleteUrl(c context.Context, shortenedUrl string) (string, error)

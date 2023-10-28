@@ -8,8 +8,8 @@ import (
 	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog/log"
-	"github.com/sanchitdeora/db"
-	"github.com/sanchitdeora/urlshort"
+	"github.com/sanchitdeora/go-url-shortener/db"
+	"github.com/sanchitdeora/go-url-shortener/urlshort"
 )
 
 const (
@@ -36,8 +36,7 @@ func main() {
 	// service initialization
 	urlShortService := urlshort.NewUrlShortener(&urlshort.Opts{
 		KeyLength: 10,
-		ShortKeyDomainPrefix: "http://localhost",
-		Port: PORT_NUMBER,
+		ShortKeyDomainPrefix: "http://localhost" + PORT_NUMBER,
 		DB: db,
 	})
 
@@ -59,6 +58,6 @@ func startRouter(service *urlshort.ApiService) {
 	r.POST("/shorten", service.HandleUrlShortener)
 	r.GET("/short/:id", service.HandleUrlRedirect)
 	
-	log.Printf("URL Shortener is listening on", PORT_NUMBER)
+	log.Info().Str("URL Shortener is listening on", PORT_NUMBER).Send()
 	r.Run(PORT_NUMBER)
 }

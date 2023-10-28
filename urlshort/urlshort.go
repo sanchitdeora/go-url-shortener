@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"strings"
 
 	"github.com/rs/zerolog/log"
-	"github.com/sanchitdeora/db"
+	"github.com/sanchitdeora/go-url-shortener/db"
 )
 
+//go:generate mockgen -destination=./mocks/mock_urlshort.go -package=mock_urlshort github.com/sanchitdeora/go-url-shortener/urlshort Service
 type Service interface {
 	UrlShortener(c context.Context, url string) (string, error)
 	GetCompleteUrl(c context.Context, shortenedUrl string) (string, error)
@@ -23,7 +23,6 @@ type serviceImpl struct {
 type Opts struct {
 	KeyLength 				int
 	ShortKeyDomainPrefix    string
-	Port 					string
 	DB 			    		db.Database
 }
 
@@ -74,7 +73,7 @@ func (s *serviceImpl) UrlShortener(c context.Context, completeUrl string) (strin
 
 func createKey(url string, length int) (string) {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	
+
 	key := make([]byte, length)
 	for i := range key {
 		key[i] = charset[rand.Intn(len(charset))]
@@ -83,9 +82,5 @@ func createKey(url string, length int) (string) {
 }
 
 func (s *serviceImpl) buildShortenedUrl(key string) string {
-	if strings.Contains(s.ShortKeyDomainPrefix, "localhost") {
-		return fmt.Sprintf("%s%s/short/%s", s.ShortKeyDomainPrefix, s.Port, key)
-	}
-
 	return fmt.Sprintf("%s/short/%s", s.ShortKeyDomainPrefix, key)
 }
